@@ -1,0 +1,7 @@
+{
+  "name": "API.AI Coveo Search Webhook for Slack bot",
+  "description": "API.AI Coveo Search Webhook for Slack bot",
+  "repository": "https://github.com/coveo-labs/slack-bot",
+  "logo": "",
+  "keywords": ["api.ai", "natural language", "coveo", "slack", "bot"]
+}
