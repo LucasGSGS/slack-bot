@@ -271,8 +271,8 @@ def make_webhook_result(req):
     contentsource = parameters.get("contentSource", '')
     timeframe = parameters.get("date-time", '')
 
-    intenttype = result.get("metadata").get("intentName")
-
+    intenttype = result.get("intent").get("displayName")
+    
     print('My Intent: "%s"' %  intenttype)
 
     if intenttype == "findimage":
