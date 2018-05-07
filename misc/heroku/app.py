@@ -265,7 +265,7 @@ def make_webhook_result(req):
     print 'Req:'
     print req
 
-    result = req.get("result")
+    result = req.get("queryResult")
     parameters = result.get("parameters")
     searchterms = parameters.get("any")
     contentsource = parameters.get("contentSource", '')
