@@ -18,7 +18,6 @@ APP = Flask(__name__)
 
 
 @APP.route('/webhook', methods=['POST'])
-
 def webhook():
     print('request:')
     print(request)
@@ -33,10 +32,12 @@ def webhook():
 
 
 def get_access_token_params():
-    return "&access_token=%s&viewAllContent=1" % COVEO_API_KEY
+    return "&access_token=%s" % COVEO_API_KEY
+
 
 def create_search_query(search_params):
     return "https://platform.cloud.coveo.com/rest/search/v2?q=" + urllib.quote(search_params.encode('utf-8')) + get_access_token_params()
+
 
 def send_search_query(query):
     print("Coveo Query: " + query)
@@ -76,9 +77,10 @@ def response_template_default(result):
 
     return attachment
 
+
 def response_template_image(result):
     title = result.get('title', '')
-    uri = result['clickUri']
+    uri = result['printableUri']
     message = {
         "title": title.encode('utf-8'),
         "title_link": uri,
@@ -93,10 +95,12 @@ def response_template_image(result):
 
     return message
 
+
 def add_field(fields, label, raw, attribute):
     if raw and attribute in raw:
-        value = re.sub(r'<[^>]*>', '', ', '.join(raw[attribute])) # join values and remove html code
+        value = re.sub(r'<[^>]*>', '', ', '.join(raw[attribute]))  # join values and remove html code
         fields.append({"title": label, "value": value})
+
 
 def response_template_jsdoc(result):
     uri = result['clickUri']
@@ -117,12 +121,14 @@ def response_template_jsdoc(result):
         message['fields'] = fields
 
         if raw['jsdoctitle']:
-            result['title'] = raw['jsdoctitle'] # update title
+            result['title'] = raw['jsdoctitle']  # update title
 
     return message
 
+
 def get_icon_for_feature_support(raw, feature_name):
-    return ':white_check_mark:' if raw.get(feature_name) == 'true' else ':no_entry_sign:'
+    return ':white_check_mark:' if raw.get(feature_name).lower() == 'true' else ':no_entry_sign:'
+
 
 def response_template_connector(result):
     uri = result['clickUri']
@@ -158,6 +164,7 @@ def response_template_connector(result):
 
     return message
 
+
 def response_empty():
     slack_message = {
         "text": "I couldn't find any result.",
@@ -169,14 +176,15 @@ def response_empty():
             }
         ]
     }
-    return {        
+    return {
         "fulfillmentText": "I couldn't find any result. Sorry.",
         "payload": {"slack": slack_message}
     }
 
+
 def response_error(err):
     message = "There was an issue with the request. Please contact your administrator. (%s)" % err
-    return {        
+    return {
         "fulfillmentText": message,
         "payload": {
             "slack": {
@@ -184,6 +192,7 @@ def response_error(err):
             }
         }
     }
+
 
 def response_for_agent(response, slack_message_creator, message, query=None):
     if 'error' in response and response['error']:
@@ -220,7 +229,7 @@ def response_for_agent(response, slack_message_creator, message, query=None):
 
         summary = message.format(title=title.encode('utf-8'), Excerpt=excerpt.encode('utf-8'))
 
-        return {            
+        return {
             "fulfillmentText": summary,
             "payload": {"slack": slack_message}
         }
@@ -228,6 +237,29 @@ def response_for_agent(response, slack_message_creator, message, query=None):
     except Exception as any_exception:
         print "Unexpected error:", any_exception
         return response_error(any_exception)
+
+
+def get_coveo_date(date):
+    if date:
+        date = date.split('T')[0]
+        date = date.replace('-', '/')  # Dialogflow V2 uses format 2017-06-15T12:00:00-04:00 and Coveo 2017/06/15
+
+    return date
+
+
+def get_coveo_date_expr(timeframe):
+    print "timeframe: %s" % timeframe
+    dateexpr = ""
+    if timeframe:
+        startdate = get_coveo_date(timeframe.get("startDate"))
+        enddate = get_coveo_date(timeframe.get("endDate"))
+        if startdate and enddate:
+            dateexpr = " AND @date=" + startdate + ".." + enddate
+        elif startdate:
+            dateexpr = " AND @date>=" + startdate
+
+    return dateexpr
+
 
 def add_feedback_buttons(response):
     slack = response['payload']['slack']
@@ -269,30 +301,79 @@ def make_webhook_result(req):
 
     intenttype = result.get("intent").get("displayName")
 
-    print('My Intent: "%s"' %  intenttype)
+    print('My Intent: "%s"' % intenttype)
 
-    if intenttype == "findimage":
-        query = create_search_query("@awsrekognition==%s" % searchterms)
+    if intenttype == "Help":
+        return {
+            "fulfillmentText": "Here's what you can ask:",
+            "payload": {
+                "slack": {
+                    "attachments": [
+                        {
+                            "pretext": "Here are the commands you can ask Coveo:\n\n*Images*",
+                            "color": "#007766",
+                            "mrkdwn_in": ["fields", "pretext"],
+                            "fields": [
+                                {
+                                    "value": "Find images with _beach_\n Find images with _helicopters_"
+                                }
+                            ]
+                        },
+                        {
+                            "color": "#1DA2D5",
+                            "mrkdwn_in": ["fields", "pretext"],
+                            "pretext": "*Developers Documentation*",
+                            "fields": [
+                                {
+                                    "value": "Show doc for _QueryBuilder_"
+                                }
+                            ]
+                        },
+                        {
+                            "color": "#B10007",
+                            "mrkdwn_in": ["fields", "pretext"],
+                            "pretext": "*Search*",
+                            "fields": [
+                                {
+                                    "value": "Search for _Tesla_\n Search for _Tesla_ from _yesterday_\n Search for _JavaScript_ \n Search for _JavaScript_ in _Tech News_"
+                                }
+                            ]
+                        },
+                        {
+                            "color": "#FFAC23",
+                            "mrkdwn_in": ["fields", "pretext"],
+                            "pretext": "*Connector versions*",
+                            "fields": [
+                                {
+                                    "value": "Find version for the connector _Jive_\n What are the supported versions for _Sharepoint_?"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    elif intenttype == "findimage":
+        query = create_search_query("@awsrekognition=(%s)" % searchterms)
         response = send_search_query(query)
 
         return response_for_agent(response, response_template_image, "The top result is: {title}")
 
     elif intenttype == "showdoc":
-        query = create_search_query("@jsdoctitle==%s" % searchterms)
+        query = create_search_query("@jsdoctitle==(%s)" % searchterms)
         response = send_search_query(query)
 
         return response_for_agent(response, response_template_jsdoc, "The top result is: {title}")
 
     elif intenttype == "versionsForConnector":
-        query = create_search_query('@vohconnector=%s and @uri in ("https://onlinehelp.coveo.com/en/cloud/add_edit_amazon_s3_source.htm.splid" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Box_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/add_edit_confluence_legacy_source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Confluence_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Confluence_Cloud_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Drive_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Drive_for_Work_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Dropbox_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Exchange_Online_Personal_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Gmail_Personal_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Gmail_for_Work_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_JIRA_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_JIRA_Cloud_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Jive_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Jive_Cloud_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Lithium_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Push_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_RSS_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Salesforce_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_SharePoint_Online_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Sitecore_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Sitemap_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_Web_Source.htm" OR "https://onlinehelp.coveo.com/en/cloud/Add_Edit_YouTube_Source.htm")' % parameters.get("connector"))
+        query = create_search_query('@vohconnector=(%s) AND @vohplatformversion=Cloud' % parameters.get("connector"))
         response = send_search_query(query)
 
         return response_for_agent(response, response_template_connector, "The top result is: {title}")
 
-
     elif intenttype == "UserMakesQuery - yes":
         print('TODO: send YES to UA event...')
-        return {            
+        return {
             "fulfillmentText": "Great!",
             "payload": {
                 "slack": {
@@ -319,15 +400,11 @@ def make_webhook_result(req):
     else:
         print "source: %s" % contentsource
         if contentsource:
-            contentsource = ' AND @syssource="%s"' % contentsource
+            contentsource = ' AND @source="%s"' % contentsource
 
-        print "timeframe: %s" % timeframe
-        timeframe = timeframe.split('/')[0]
-        timeframe = timeframe.replace('-', '/') # API.ai uses format 2017-06-15 and Coveo 2017/06/15
-        if timeframe:
-            timeframe = " AND @date>=" + timeframe
+        dateexpr = get_coveo_date_expr(timeframe)
 
-        query = ''.join((searchterms, contentsource, timeframe))
+        query = ''.join((searchterms, contentsource, dateexpr))
         response = send_search_query(create_search_query(query))
 
         response = response_for_agent(response, response_template_default, "The top result is: {title}\nThe summary is: \n{Excerpt}", query)
@@ -335,6 +412,7 @@ def make_webhook_result(req):
             add_feedback_buttons(response)
 
         return response
+
 
 if __name__ == '__main__':
     PORT = int(os.getenv('PORT', 5000))
