@@ -169,23 +169,20 @@ def response_empty():
             }
         ]
     }
-    return {
-        "speech": "I couldn't find any result. Sorry.",
-        "displayText": "I couldn't find any result. Sorry.",
-        "data": {"slack": slack_message}
+    return {        
+        "fulfillmentText": "I couldn't find any result. Sorry.",
+        "payload": {"slack": slack_message}
     }
 
 def response_error(err):
     message = "There was an issue with the request. Please contact your administrator. (%s)" % err
-    return {
-        "speech": message,
-        "displayText": message,
-        "data": {
+    return {        
+        "fulfillmentText": message,
+        "payload": {
             "slack": {
                 "text": message
             }
-        },
-        "error": True
+        }
     }
 
 def response_for_agent(response, slack_message_creator, message, query=None):
@@ -223,10 +220,9 @@ def response_for_agent(response, slack_message_creator, message, query=None):
 
         summary = message.format(title=title.encode('utf-8'), Excerpt=excerpt.encode('utf-8'))
 
-        return {
-            "speech": summary,
-            "displayText": summary,
-            "data": {"slack": slack_message}
+        return {            
+            "fulfillmentText": summary,
+            "payload": {"slack": slack_message}
         }
 
     except Exception as any_exception:
@@ -234,7 +230,7 @@ def response_for_agent(response, slack_message_creator, message, query=None):
         return response_error(any_exception)
 
 def add_feedback_buttons(response):
-    slack = response['data']['slack']
+    slack = response['payload']['slack']
 
     if 'attachments' in slack:
         slack['attachments'].append({
@@ -272,7 +268,7 @@ def make_webhook_result(req):
     timeframe = parameters.get("date-time", '')
 
     intenttype = result.get("intent").get("displayName")
-    
+
     print('My Intent: "%s"' %  intenttype)
 
     if intenttype == "findimage":
@@ -296,10 +292,9 @@ def make_webhook_result(req):
 
     elif intenttype == "UserMakesQuery - yes":
         print('TODO: send YES to UA event...')
-        return {
-            "speech": "Great!",
-            "displayText": "Great!",
-            "data": {
+        return {            
+            "fulfillmentText": "Great!",
+            "payload": {
                 "slack": {
                     "response_type": "ephemeral",
                     "replace_original": True,
@@ -311,9 +306,8 @@ def make_webhook_result(req):
     elif intenttype == "UserMakesQuery - no":
         print('TODO: send NO to UA event...')
         return {
-            "speech": "Okay.",
-            "displayText": "Okay.",
-            "data": {
+            "fulfillmentText": "Okay.",
+            "payload": {
                 "slack": {
                     "response_type": "ephemeral",
                     "replace_original": True,
@@ -337,7 +331,7 @@ def make_webhook_result(req):
         response = send_search_query(create_search_query(query))
 
         response = response_for_agent(response, response_template_default, "The top result is: {title}\nThe summary is: \n{Excerpt}", query)
-        if 'Sorry.' not in response['displayText']:
+        if 'Sorry.' not in response["fulfillmentText"]:
             add_feedback_buttons(response)
 
         return response
